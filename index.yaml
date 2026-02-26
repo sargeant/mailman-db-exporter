@@ -1,0 +1,17 @@
+apiVersion: v1
+entries:
+  mailman-db-exporter:
+  - apiVersion: v2
+    appVersion: 1.0.2
+    created: "2026-02-26T06:29:05.454302918Z"
+    description: Prometheus exporter for Mailman 3 that reads directly from PostgreSQL
+    digest: 19e4c25f59b6ca80b474fcb5c4df68f848b1cffd25e542cff8651b88b4d4ce48
+    maintainers:
+    - email: sam@sargeant.net.nz
+      name: Sam Sargeant
+    name: mailman-db-exporter
+    type: application
+    urls:
+    - https://github.com/sargeant/mailman-db-exporter/releases/download/mailman-db-exporter-1.0.2/mailman-db-exporter-1.0.2.tgz
+    version: 1.0.2
+generated: "2026-02-26T06:29:05.454310162Z"
