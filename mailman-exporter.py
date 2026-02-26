@@ -14,6 +14,7 @@ import logging
 import os
 import signal
 import sys
+import threading
 import time
 from http.server import HTTPServer
 
@@ -357,17 +358,13 @@ def main():
 
     def _shutdown(signum, _frame):
         log.info("received %s, shutting down", signal.Signals(signum).name)
-        server.shutdown()
+        threading.Thread(target=server.shutdown).start()
 
     signal.signal(signal.SIGTERM, _shutdown)
     signal.signal(signal.SIGINT, _shutdown)
 
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        pass
-    finally:
-        log.info("stopped")
+    server.serve_forever()
+    log.info("stopped")
 
 
 if __name__ == "__main__":
