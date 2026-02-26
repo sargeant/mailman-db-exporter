@@ -1,0 +1,41 @@
+image:
+  repository: ghcr.io/sargeant/mailman-db-exporter
+  tag: ""
+  pullPolicy: IfNotPresent
+
+database:
+  host: ""
+  port: "5432"
+  name: "mailman"
+  user: "mailman"
+  password: ""
+  # Reference an existing secret containing DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS keys.
+  # When set, the above fields are ignored.
+  existingSecret: ""
+
+exporter:
+  port: 9934
+  logLevel: INFO
+
+serviceMonitor:
+  enabled: false
+  interval: 60s
+  scrapeTimeout: 30s
+  labels: {}
+  # e.g. release: kube-prometheus-stack
+
+service:
+  port: 9934
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 32Mi
+  limits:
+    memory: 64Mi
+
+podAnnotations: {}
+podLabels: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

@@ -1,0 +1,9 @@
+apiVersion: v2
+name: mailman-db-exporter
+description: Prometheus exporter for Mailman 3 that reads directly from PostgreSQL
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+maintainers:
+  - name: Sam Sargeant
+    email: sam@sargeant.net.nz
