@@ -6,6 +6,7 @@ ENV UV_CACHE_DIR=/tmp/uv-cache
 
 # pre-cache libs needed by script
 RUN uv run --script /app/mailman-exporter.py --help
+RUN chown -R nobody:nogroup /tmp/uv-cache
 
 USER nobody
 
