@@ -16,6 +16,16 @@ database:
 exporter:
   port: 9934
   logLevel: INFO
+  # Named filtered member counts. Each entry emits
+  # mailman_filtered_members_total{filter="<name>"}: distinct verified member
+  # addresses on at least one list *other* than those excluded. An address only
+  # on excluded lists is not counted.
+  # e.g.
+  # filteredMemberCounts:
+  #   subscribers:
+  #     - allowlist.example.com
+  #     - surveys.example.com
+  filteredMemberCounts: {}
 
 serviceMonitor:
   enabled: false

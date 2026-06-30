@@ -29,8 +29,10 @@ spec:
           envFrom:
             - secretRef:
                 name: {{ .Values.database.existingSecret }}
-          {{- else }}
+          {{- end }}
+          {{- if or (not .Values.database.existingSecret) .Values.exporter.filteredMemberCounts }}
           env:
+            {{- if not .Values.database.existingSecret }}
             - name: DB_HOST
               value: {{ .Values.database.host | quote }}
             - name: DB_PORT
@@ -41,6 +43,11 @@ spec:
               value: {{ .Values.database.user | quote }}
             - name: DB_PASS
               value: {{ .Values.database.password | quote }}
+            {{- end }}
+            {{- with .Values.exporter.filteredMemberCounts }}
+            - name: MAILMAN_FILTERED_MEMBER_COUNTS
+              value: {{ toJson . | quote }}
+            {{- end }}
           {{- end }}
           args:
             - "--log-level"

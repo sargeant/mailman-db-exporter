@@ -10,6 +10,7 @@ It uses hardcoded enums from the mailman source.
 """
 
 import argparse
+import json
 import logging
 import os
 import signal
@@ -54,9 +55,46 @@ REQUEST_TYPE_NAMES = {
 }
 
 
+def _parse_filtered_member_counts(raw: str | None) -> dict[str, list[str]]:
+    """Parse MAILMAN_FILTERED_MEMBER_COUNTS into {filter_name: [excluded list_ids]}.
+
+    Each named group emits mailman_filtered_members_total{filter="<name>"}, the
+    count of distinct verified member addresses that belong to at least one list
+    *other* than the excluded ones. An address only on excluded lists is dropped.
+
+    Accepts JSON, e.g.:
+        {"subscribers": ["allowlist.example.com", "surveys.example.com"]}
+    """
+    if not raw or not raw.strip():
+        return {}
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError as err:
+        raise ValueError(
+            f"MAILMAN_FILTERED_MEMBER_COUNTS is not valid JSON: {err}"
+        ) from err
+    if not isinstance(parsed, dict):
+        raise ValueError(
+            "MAILMAN_FILTERED_MEMBER_COUNTS must be a JSON object "
+            '{"name": ["list_id", ...]}'
+        )
+    result: dict[str, list[str]] = {}
+    for name, excluded in parsed.items():
+        if not isinstance(excluded, list) or not all(
+            isinstance(x, str) for x in excluded
+        ):
+            raise ValueError(
+                f"MAILMAN_FILTERED_MEMBER_COUNTS['{name}'] must be a list of "
+                "list_id strings"
+            )
+        result[str(name)] = excluded
+    return result
+
+
 class MailmanCollector:
-    def __init__(self, dsn: str):
+    def __init__(self, dsn: str, filtered_member_counts: dict[str, list[str]] | None = None):
         self.dsn = dsn
+        self.filtered_member_counts = filtered_member_counts or {}
 
     def collect(self):
         log.debug("starting scrape")
@@ -239,6 +277,8 @@ class MailmanCollector:
 
             yield from self._list_timestamps(conn)
 
+            yield from self._filtered_member_counts(conn)
+
         up = GaugeMetricFamily(
             "mailman_exporter_up", "Whether the Mailman exporter scrape is working"
         )
@@ -286,6 +326,42 @@ class MailmanCollector:
             created.add_metric([list_id], created_at or 0)
         yield last_post
         yield created
+
+    def _filtered_member_counts(self, conn):
+        """Per-filter count of distinct verified members, excluding given lists.
+
+        For each configured filter, count distinct member addresses that appear
+        on at least one list NOT in the excluded set. An address whose only
+        memberships are on excluded lists is not counted. This reproduces the
+        legacy survey "exclude_listnames" semantics: filtering happens before
+        the DISTINCT, so cross-membership is preserved.
+        """
+        if not self.filtered_member_counts:
+            return
+
+        g = GaugeMetricFamily(
+            "mailman_filtered_members_total",
+            "Distinct verified member addresses on at least one non-excluded list",
+            labels=["filter"],
+        )
+        for name, excluded in self.filtered_member_counts.items():
+            log.debug("collecting filtered_members filter=%s", name)
+            row = conn.execute(
+                """
+                SELECT count(*) FROM (
+                    SELECT DISTINCT a.email
+                    FROM member m
+                    JOIN address a ON m.address_id = a.id
+                    WHERE m.role = %(role)s
+                      AND a.verified_on IS NOT NULL
+                      AND a.email ~ '@.+\\.'
+                      AND m.list_id <> ALL(%(excluded)s)
+                ) s
+                """,
+                {"role": MEMBER_ROLE_MEMBER, "excluded": excluded},
+            ).fetchone()
+            g.add_metric([name], row[0])
+        yield g
 
 
 def _build_dsn() -> str:
@@ -335,6 +411,16 @@ def main():
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
     )
     parser.add_argument(
+        "--filtered-member-counts",
+        default=os.environ.get("MAILMAN_FILTERED_MEMBER_COUNTS"),
+        help=(
+            "JSON object mapping a filter name to a list of list_ids to exclude, "
+            'e.g. {"subscribers": ["allowlist.example.com"]}. Emits '
+            "mailman_filtered_members_total{filter=...}. "
+            "Default: $MAILMAN_FILTERED_MEMBER_COUNTS"
+        ),
+    )
+    parser.add_argument(
         "--stdout",
         action="store_true",
         help="Print metrics to stdout and exit",
@@ -346,8 +432,21 @@ def main():
         format="%(asctime)s %(levelname)s %(message)s",
     )
 
+    try:
+        filtered_member_counts = _parse_filtered_member_counts(
+            args.filtered_member_counts
+        )
+    except ValueError as err:
+        log.error("%s", err)
+        sys.exit(2)
+    if filtered_member_counts:
+        log.info(
+            "filtered member counts configured: %s",
+            ", ".join(filtered_member_counts),
+        )
+
     dsn = args.dsn or _build_dsn()
-    REGISTRY.register(MailmanCollector(dsn))
+    REGISTRY.register(MailmanCollector(dsn, filtered_member_counts))
 
     if args.stdout:
         sys.stdout.buffer.write(generate_latest(REGISTRY))
