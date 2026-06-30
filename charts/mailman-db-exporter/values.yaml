@@ -9,9 +9,13 @@ database:
   name: "mailman"
   user: "mailman"
   password: ""
-  # Reference an existing secret containing DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS keys.
-  # When set, the above fields are ignored.
+  # Reference an existing secret. When set, the inline fields above are ignored.
   existingSecret: ""
+  # If the existing secret holds a full DSN under a single key (e.g. a CNPG
+  # *-app secret with a "uri" key), name that key here. The DSN is wired to
+  # MAILMAN_DB_DSN via secretKeyRef. When empty, the secret is consumed with
+  # envFrom and must provide DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASS keys.
+  existingSecretDsnKey: ""
 
 exporter:
   port: 9934

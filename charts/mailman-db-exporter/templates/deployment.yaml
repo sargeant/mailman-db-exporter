@@ -25,14 +25,24 @@ spec:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          {{- if .Values.database.existingSecret }}
+          {{- $secret := .Values.database.existingSecret }}
+          {{- $dsnKey := .Values.database.existingSecretDsnKey }}
+          {{- if and $secret (not $dsnKey) }}
           envFrom:
             - secretRef:
-                name: {{ .Values.database.existingSecret }}
+                name: {{ $secret }}
           {{- end }}
-          {{- if or (not .Values.database.existingSecret) .Values.exporter.filteredMemberCounts }}
+          {{- if or (not $secret) $dsnKey .Values.exporter.filteredMemberCounts }}
           env:
-            {{- if not .Values.database.existingSecret }}
+            {{- if $secret }}
+            {{- if $dsnKey }}
+            - name: MAILMAN_DB_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secret }}
+                  key: {{ $dsnKey }}
+            {{- end }}
+            {{- else }}
             - name: DB_HOST
               value: {{ .Values.database.host | quote }}
             - name: DB_PORT

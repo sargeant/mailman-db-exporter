@@ -78,6 +78,7 @@ the number.
 See [values.yaml](charts/mailman-db-exporter/values.yaml). Key settings:
 
 - `database.existingSecret` — reference a pre-existing Secret containing `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS` keys (ignores inline `database.*` fields when set)
+- `database.existingSecretDsnKey` — if the existing Secret holds a full DSN under a single key (e.g. a CNPG `*-app` Secret with a `uri` key), name that key here; it's wired to `MAILMAN_DB_DSN`
 - `serviceMonitor.enabled` — creates a Prometheus Operator ServiceMonitor
 - `serviceMonitor.labels` — must match your Prometheus Operator's selector (e.g. `release: kube-prometheus-stack`)
 
